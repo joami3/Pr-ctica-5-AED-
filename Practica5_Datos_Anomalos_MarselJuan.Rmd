@@ -204,44 +204,49 @@ Escribe una función que detecte los outliers de un vector $x$ para cada uno de 
   * **Percentiles** `reglapercentil(x)`: Cualquier valor que esté fuera del rango del percentil 5% y 95% se puede considerar como atípico. Usa la función `quantile` para calcular los percentiles.
 
 ```{r , include = FALSE}
-a <- clean_iris %>%
-  summarise(across(
-    where(is.numeric),
-    list(
-      media = ~ mean(., na.rm = TRUE),
-      desviacion_tipica = ~ sd(., na.rm = TRUE),
-      mediana = ~ median(., na.rm = TRUE),
-      madm = ~ MADM(.),
-      iqr = ~ IQR(., na.rm = TRUE)
-    )   
-  ))
 # Regla 3 sigma
 #Valores por encima de 3 desviaciones típicas se consideran outliers.
 
 Regla_tres <- function(x) {
   x <- unlist(x)
-  for (i in seq_along(x)) {
-    if (x[i] > (3 * sd(x))) {
-      print(paste( "Posición:", i))
-    }
-  }
+  umbral <- 3 * sd(x, na.rm = TRUE)
+  ifelse(abs(x - mean(x, na.rm = TRUE)) > umbral, TRUE, FALSE)
 }
 
-clean_iris %>%
-  summarise(across(where(is.numeric), ~ Regla_tres(.)))
-
 # Identificador Hampel
-Hampel <-  function(x)
+# Valores por encima de 3 MADM se consideran outliers.
 
+Hampel <- function(x) {
+  x <- unlist(x)
+  umbral <- 3 * MADM(x)
+  ifelse(x > umbral, TRUE, FALSE)
+}
 
 # Regla boxplot
-
+reglaboxplot<-function(x){
+  if(all(is.na(x))){
+    return(rep(NA,length(x)))
+  }
+  xu<-quantile(x, 0.75, na.rm = TRUE)
+  xi<-quantile(x, 0.25, na.rm = TRUE)
+  IQR<-xu-xi
+  outliers<-if_else((x>xu+1.5*IQR)|(x<xi-1.5*IQR),T,F)
+  return(outliers)
+}
 
 # Percentiles
+reglapercentil<-function(x){
+  if(all(is.na(x))){
+    return(rep(NA,length(x)))
+  }
+  xu<-quantile(x, 0.05, na.rm = TRUE)
+  xi<-quantile(x, 0.95, na.rm = TRUE)
+
+  outliers<-if_else((x<xu)|(x>xi),T,F)
+  return(outliers)
+}
 
 ```
-
-
 ## Ejercicio 6: Detección de outliers
 
 Utiliza la función `mutate` y `across` para identificar los outliers en la variable `Petal.Length` con todos los métodos de detección de outliers implementados. Genera una columna nueva para cada método. 
@@ -249,8 +254,15 @@ Nota: podría extenderse la aplicación a todas las variables numéricas usando 
 
 ```{r Solucion ejercicio 6, include=TRUE, echo=TRUE, eval=TRUE, results=TRUE}
 
+library(dplyr)
 
-
+outliers_iris <- clean_iris %>%
+  mutate(
+    outlier_Regla3 = Regla_tres(Petal.Length),
+    outlier_Hampel = Hampel(Petal.Length),
+    outlier_Boxplot = reglaboxplot(Petal.Length),
+    outlier_Percentil = reglapercentil(Petal.Length)
+  )
 ```
 
 ## Ejercicio 7: Comparativa de los métodos de detección de outliers
@@ -261,7 +273,12 @@ En los métodos de detección de outliers analizados, examina los resultados com
   * Los valores etiquetados como outliers (ordenados de menor a mayor).
 
 ```{r Solucion ejercicio 7, include=TRUE, echo=TRUE, eval=TRUE, results=TRUE}
-
+outliers_iris %>% 
+  select(.,starts_with("outlier")) %>%
+  summarise(across(
+    where(is.logical),
+    list(total_outliers=~sum(.))
+  ))
 ```
 
 ## Ejercicio 8: Representación gráfica
@@ -271,7 +288,31 @@ Representa gráficamente los datos de `Petal.Length` (distribución de puntos en
 Nota: usa en `geom_point` con la opción `position='jitter'` para mejorar la legibilidad del gráfico.
 
 ```{r Solucion ejercicio 8, include=TRUE, echo=TRUE, eval=TRUE, results=TRUE}
+iris_out <- clean_iris %>%
+  mutate(
+    outlier_Regla3 = Regla_tres(Petal.Length),
+    outlier_Hampel = Hampel(Petal.Length),
+    outlier_Boxplot = reglaboxplot(Petal.Length),
+    outlier_Percentil = reglapercentil(Petal.Length)
+  ) %>%
+  # 2️⃣ Reorganizar con pivot_longer (de ancho a largo)
+  pivot_longer(
+    cols = starts_with("outlier_"),
+    names_to = "Metodo",
+    values_to = "Es_outlier"
+  )
 
+ggplot(iris_out, aes(x = Metodo, y = Petal.Length, color = Es_outlier)) +
+  geom_point(position = position_jitter(width = 0.2, height = 0)) +
+  scale_color_manual(values = c("FALSE" = "gray50", "TRUE" = "red")) +
+  labs(
+    title = "Detección de outliers en Petal.Length",
+    subtitle = "Comparación entre métodos (Regla 3σ, Hampel, Boxplot, Percentil)",
+    x = "Método de detección",
+    y = "Petal.Length",
+    color = "Outlier"
+  ) +
+  theme_minimal(base_size = 13)
 ```
 
 # Imputación de datos
