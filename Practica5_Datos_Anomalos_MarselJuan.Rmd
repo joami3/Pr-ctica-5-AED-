@@ -295,7 +295,6 @@ iris_out <- clean_iris %>%
     outlier_Boxplot = reglaboxplot(Petal.Length),
     outlier_Percentil = reglapercentil(Petal.Length)
   ) %>%
-  # 2️⃣ Reorganizar con pivot_longer (de ancho a largo)
   pivot_longer(
     cols = starts_with("outlier_"),
     names_to = "Metodo",
