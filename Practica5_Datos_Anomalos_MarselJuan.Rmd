@@ -88,8 +88,13 @@ dirty_iris %>% arrange(desc(Sepal.Length))
 dirty_iris %>% arrange(desc(Sepal.Width))  
 dirty_iris %>% arrange(desc(Petal.Length)) 
 dirty_iris %>% arrange(desc(Petal.Width))
-
 ```
+Llama la atención que en algunos valores faltantes, como la primera observación ordenadas de menor a mayor en Sepal.Length es 0 en lugar de NA, lo cual es imposible ya que por pequeña que sea algun valor debería de tener.
+Por otro lado, cuando ordenas de menor a mayor Sepal.Width la primera observación es negativa y la segunda 0, siendo ambos casos imposibles, ya que deberían ser o NA o un valor positivo.
+Sepal.Length ordenado de menor a mayor, de nuevo presenta un valor de 0 en la primera observación.
+
+Cuando ordenamos de mayor a menor, obtenemos valores muy grandes que desentonan demasiado, haciendo pensar que se tratan de outliers. El mejor ejemplo es cuando ordenamos Petal.Width de mayor a menor y vemos que en la primera columna tiene un valor de infinito, siendo también imposible.
+
 
 ## Ejercicio 2: Valores especiales
 
@@ -109,8 +114,13 @@ Nota: Puedes reemplazar los valores para cada variable del dataframe usando `mut
 
 ```{r Solucion ejercicio 2, include=TRUE, echo=TRUE, eval=TRUE, results=TRUE}
 # DEBEMOS ELIMINAR TAMBIEN LOS VALROES IGUALES A CERO YA QUE SE TRATA DE LONGITUDES DE PARTES DE UNA FLOR. NO PUEDEN SER O
+library(dplyr)
 
-
+AB_iris <- dirty_iris %>%
+  mutate(across(
+    where(is.numeric),  
+    ~ ifelse(!is.finite(.) | . <= 0, NA, .)  
+  ))
 ```
 
 
@@ -120,6 +130,12 @@ Nota: Puedes reemplazar los valores para cada variable del dataframe usando `mut
   * Emplea después la función `na.omit` para quedarnos solo con las filas con datos completos en un nuevo data frame `clean_iris`.
 
 ```{r Solucion ejercicio 3, include=TRUE, echo=TRUE, eval=TRUE, results=TRUE}
+num_completas <- sum(complete.cases(AB_iris))
+porc_completas <- mean(complete.cases(AB_iris)) * 100
+
+lapply(AB_iris,complete.cases)
+
+clean_iris <- na.omit(AB_iris) 
 
 ```
 
@@ -142,8 +158,38 @@ Hazlo para el data frame con observaciones completas `clean_iris` (que no tiene 
 
 ```{r , include = TRUE}
 
-```
+MADM <- function(x) {
+  1.4826 * median(abs(x - median(x, na.rm = TRUE)), na.rm = TRUE)
+}
 
+clean_iris %>%
+  summarise(across(
+    where(is.numeric),
+    list(
+      media = ~ mean(., na.rm = TRUE),
+      desviacion_tipica = ~ sd(., na.rm = TRUE),
+      mediana = ~ median(., na.rm = TRUE),
+      madm = ~ MADM(.),
+      iqr = ~ IQR(., na.rm = TRUE)
+    )   
+  ))
+
+AB_iris %>%  
+  summarise(across(
+    where(is.numeric),
+    list(media = ~ mean(., na.rm = TRUE),
+      desviacion_tipica = ~ sd(., na.rm = TRUE),
+      mediana = ~ median(., na.rm = TRUE),
+      madm = ~ MADM(.),
+      iqr = ~ IQR(., na.rm = TRUE)
+      )
+  ))
+```
+La media para Petal.Length es mayor es en el conjunto dirty.
+La desviacion típica para Petal.Length es considerablemente mayor en el conjnto dirty, debido a la existencia de valores extremos.
+La mediana para Petal.Length se mantiene entre ambos conjuntos de datos.
+El MADM se mantiene para cada conjunto de datos.
+El IQR es ligeramente más alto en el IQR.
 
 ## Ejercicio 5: Métodos de detección de outliers
 
@@ -158,11 +204,34 @@ Escribe una función que detecte los outliers de un vector $x$ para cada uno de 
   * **Percentiles** `reglapercentil(x)`: Cualquier valor que esté fuera del rango del percentil 5% y 95% se puede considerar como atípico. Usa la función `quantile` para calcular los percentiles.
 
 ```{r , include = FALSE}
+a <- clean_iris %>%
+  summarise(across(
+    where(is.numeric),
+    list(
+      media = ~ mean(., na.rm = TRUE),
+      desviacion_tipica = ~ sd(., na.rm = TRUE),
+      mediana = ~ median(., na.rm = TRUE),
+      madm = ~ MADM(.),
+      iqr = ~ IQR(., na.rm = TRUE)
+    )   
+  ))
 # Regla 3 sigma
+#Valores por encima de 3 desviaciones típicas se consideran outliers.
 
+Regla_tres <- function(x) {
+  x <- unlist(x)
+  for (i in seq_along(x)) {
+    if (x[i] > (3 * sd(x))) {
+      print(paste( "Posición:", i))
+    }
+  }
+}
+
+clean_iris %>%
+  summarise(across(where(is.numeric), ~ Regla_tres(.)))
 
 # Identificador Hampel
-
+Hampel <-  function(x)
 
 
 # Regla boxplot
