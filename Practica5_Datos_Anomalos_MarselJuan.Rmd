@@ -311,7 +311,7 @@ ggplot(iris_out, aes(x = Metodo, y = Petal.Length, color = Es_outlier)) +
     y = "Petal.Length",
     color = "Outlier"
   ) +
-  theme_minimal(base_size = 13)
+  theme_minimal(base_size=13)
 ```
 
 # Imputación de datos
